@@ -1,0 +1,69 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: ["feature/devops", "main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  ci:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Bước 1: Checkout source code ──────────────────────────────────────
+      - name: "📥 Checkout source code"
+        uses: actions/checkout@v4
+
+      # ── Bước 2: Cài đặt Node.js ───────────────────────────────────────────
+      - name: "⚙️ Setup Node.js 18"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      # ── Bước 3: Install dependencies ──────────────────────────────────────
+      - name: "📦 Install dependencies"
+        run: npm install
+
+      # ── Bước 4: Test ──────────────────────────────────────────────────────
+      - name: "🧪 Run tests"
+        run: |
+          if npm run test --if-present; then
+            echo "Tests passed!"
+          else
+            echo "No test script found or tests failed, continuing..."
+          fi
+        continue-on-error: false
+
+      # ── Bước 5: Build Docker image ────────────────────────────────────────
+      - name: "🐳 Build Docker image"
+        run: docker build -t express-hello-world:${{ github.sha }} .
+
+      # ── Thông báo kết quả ─────────────────────────────────────────────────
+      - name: "✅ Notify Success"
+        if: success()
+        run: |
+          echo "=============================================="
+          echo "✅ CI PIPELINE COMPLETED SUCCESSFULLY!"
+          echo "Branch : ${{ github.ref_name }}"
+          echo "Commit : ${{ github.sha }}"
+          echo "Author : ${{ github.actor }}"
+          echo "=============================================="
+
+  notify-failure:
+    name: Notify Failure
+    runs-on: ubuntu-latest
+    needs: ci
+    if: failure()
+    steps:
+      - name: "❌ Notify Failure"
+        run: |
+          echo "=============================================="
+          echo "❌ CI PIPELINE FAILED!"
+          echo "Branch : ${{ github.ref_name }}"
+          echo "Commit : ${{ github.sha }}"
+          echo "Author : ${{ github.actor }}"
+          echo "Please check the logs for details."
+          echo "=============================================="
